@@ -31,5 +31,8 @@ export default defineConfig({
       },
     ],
   },
+  resolve: {
+    tsconfigPaths: true,
+  },
   plugins: [react(), tailwindcss()],
 });
