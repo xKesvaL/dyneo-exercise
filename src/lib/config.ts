@@ -5,6 +5,7 @@ import colors from "tailwindcss/colors";
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "https://technical-exercise.dyneo.io";
 
+// TAIL <= MAX_ENTRIES
 export const TAIL = 200;
 
 export const MAX_ENTRIES = 1000;
