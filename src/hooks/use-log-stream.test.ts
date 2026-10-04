@@ -52,8 +52,8 @@ const logJson = (id: string) =>
     raw: null,
   });
 
-const render = (level: Level | "all" = "all") =>
-  renderHook(({ level }) => useLogStream(level), { initialProps: { level } });
+const render = (levels: Level[] = []) =>
+  renderHook(({ levels }) => useLogStream(levels), { initialProps: { levels } });
 
 const lastInstance = () => FakeEventSource.instances.at(-1)!;
 
@@ -68,22 +68,22 @@ describe("useLogStream", () => {
   });
 
   describe("connection URL", () => {
-    it("requests the tail and no level filter for 'all'", () => {
-      render("all");
+    it("requests the tail and no level filter when no level is selected", () => {
+      render([]);
 
       expect(FakeEventSource.instances).toHaveLength(1);
       const url = new URL(lastInstance().url);
       expect(url.pathname).toBe("/logs/stream");
       expect(url.searchParams.get("tail")).toBe(String(TAIL));
-      expect(url.searchParams.get("tail")).toBe("200");
+      expect(url.searchParams.get("tail")).toBe("500");
       expect(url.searchParams.has("level")).toBe(false);
     });
 
     it("adds the level filter when a level is given", () => {
-      render("error");
+      render(["error"]);
 
       const url = new URL(lastInstance().url);
-      expect(url.searchParams.get("tail")).toBe("200");
+      expect(url.searchParams.get("tail")).toBe("500");
       expect(url.searchParams.get("level")).toBe("error");
     });
   });
@@ -107,13 +107,101 @@ describe("useLogStream", () => {
       expect(result.current.status).toBe("reconnecting");
     });
 
-    it("is closed when errored and the connection is CLOSED", () => {
+    it("is reconnecting when errored and the connection is CLOSED, until retries run out", () => {
+      vi.useFakeTimers();
       const { result } = render();
       lastInstance().emitOpen();
 
       lastInstance().emitError(FakeEventSource.CLOSED);
 
+      expect(result.current.status).toBe("reconnecting");
+      vi.useRealTimers();
+    });
+  });
+
+  describe("automatic reconnect", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+
+    it("retries after 3s, then 10s, then 30s, then gives up as closed", () => {
+      const { result } = render();
+      lastInstance().emitOpen();
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      advance(2_999);
+      expect(FakeEventSource.instances).toHaveLength(1);
+      advance(1);
+      expect(FakeEventSource.instances).toHaveLength(2);
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      advance(9_999);
+      expect(FakeEventSource.instances).toHaveLength(2);
+      advance(1);
+      expect(FakeEventSource.instances).toHaveLength(3);
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      expect(result.current.status).toBe("reconnecting");
+      advance(29_999);
+      expect(FakeEventSource.instances).toHaveLength(3);
+      advance(1);
+      expect(FakeEventSource.instances).toHaveLength(4);
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
       expect(result.current.status).toBe("closed");
+      advance(120_000);
+      expect(FakeEventSource.instances).toHaveLength(4);
+    });
+
+    it("starts the schedule over once a retry succeeds", () => {
+      render();
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      advance(3_000);
+      lastInstance().emitOpen();
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      advance(3_000);
+
+      expect(FakeEventSource.instances).toHaveLength(3);
+    });
+
+    it("lets the user reconnect after giving up, with a fresh set of retries", () => {
+      const { result } = render();
+      for (const delay of [3_000, 10_000, 30_000]) {
+        lastInstance().emitError(FakeEventSource.CLOSED);
+        advance(delay);
+      }
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      expect(result.current.status).toBe("closed");
+
+      act(() => result.current.reconnect());
+      expect(FakeEventSource.instances).toHaveLength(5);
+      expect(result.current.status).toBe("connecting");
+
+      lastInstance().emitError(FakeEventSource.CLOSED);
+      advance(3_000);
+      expect(FakeEventSource.instances).toHaveLength(6);
+    });
+
+    it("cancels a pending retry when the user reconnects manually", () => {
+      const { result } = render();
+      lastInstance().emitError(FakeEventSource.CLOSED);
+
+      act(() => result.current.reconnect());
+      advance(3_000);
+
+      expect(FakeEventSource.instances).toHaveLength(2);
+    });
+
+    it("cancels a pending retry on unmount", () => {
+      const { unmount } = render();
+      lastInstance().emitError(FakeEventSource.CLOSED);
+
+      unmount();
+      advance(3_000);
+
+      expect(FakeEventSource.instances).toHaveLength(1);
     });
   });
 
@@ -166,9 +254,9 @@ describe("useLogStream", () => {
 
   describe("lifecycle", () => {
     it("closes the old connection and opens a new one when the level changes", () => {
-      const { rerender } = render("all");
+      const { rerender } = render([]);
 
-      rerender({ level: "error" });
+      rerender({ levels: ["error"] });
 
       expect(FakeEventSource.instances).toHaveLength(2);
       expect(FakeEventSource.instances[0].close).toHaveBeenCalledTimes(1);
@@ -176,14 +264,74 @@ describe("useLogStream", () => {
     });
 
     it("does not reconnect on re-render with the same level", () => {
-      const { rerender } = render("info");
+      const { rerender } = render(["info"]);
 
-      rerender({ level: "info" });
+      rerender({ levels: ["info"] });
 
       expect(FakeEventSource.instances).toHaveLength(1);
       expect(FakeEventSource.instances[0].close).not.toHaveBeenCalled();
     });
 
+    it("streams unfiltered when several levels are selected", () => {
+      render(["error", "critical"]);
+
+      expect(new URL(lastInstance().url).searchParams.has("level")).toBe(false);
+    });
+
+    it("keeps the connection when going from no level to several", () => {
+      const { rerender } = render([]);
+
+      rerender({ levels: ["error", "critical"] });
+
+      expect(FakeEventSource.instances).toHaveLength(1);
+    });
+  });
+
+  describe("level filtering", () => {
+    const emitLevel = (id: string, level: Level) =>
+      lastInstance().emitMessage(logJson(id).replace('"level":"info"', `"level":"${level}"`));
+
+    it("only returns entries of the selected levels", () => {
+      const { result } = render(["error", "critical"]);
+
+      emitLevel("1", "info");
+      emitLevel("2", "error");
+      emitLevel("3", "critical");
+
+      expect(result.current.entries.map((e) => e.id)).toEqual(["2", "3"]);
+    });
+
+    it("returns every entry when no level is selected", () => {
+      const { result } = render([]);
+
+      emitLevel("1", "info");
+      emitLevel("2", "error");
+
+      expect(result.current.entries).toHaveLength(2);
+    });
+
+    it("hides entries that no longer match after the selection changes", () => {
+      const { result, rerender } = render([]);
+      emitLevel("1", "info");
+      emitLevel("2", "error");
+
+      rerender({ levels: ["error"] });
+
+      expect(result.current.entries.map((e) => e.id)).toEqual(["2"]);
+    });
+
+    it("only counts matching entries as new while paused", () => {
+      const { result } = render(["error", "critical"]);
+      act(() => result.current.pause());
+
+      emitLevel("1", "info");
+      emitLevel("2", "error");
+
+      expect(result.current.newWhilePaused).toBe(1);
+    });
+  });
+
+  describe("unmount", () => {
     it("closes the connection on unmount", () => {
       const { unmount } = render();
 

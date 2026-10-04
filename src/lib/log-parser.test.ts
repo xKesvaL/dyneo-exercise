@@ -47,7 +47,7 @@ describe("parseLog", () => {
       expect(parseLog(JSON.stringify({ ...validEntry, date: "not a date" }))).toBeNull();
     });
 
-    it.each(["id", "timestamp", "date", "level", "message", "metadata"] as const)(
+    it.each(["id", "timestamp", "level", "message", "metadata"] as const)(
       "returns null when required field %s is missing",
       (field) => {
         const { [field]: _removed, ...rest } = validEntry;
@@ -98,6 +98,20 @@ describe("parseLog", () => {
     it("coerces the serialized date back into a Date", () => {
       const result = parseLog(JSON.stringify(validEntry));
       expect(result?.date).toBeInstanceOf(Date);
+      expect(result?.date.toISOString()).toBe(validEntry.timestamp);
+    });
+
+    it("derives date from timestamp when date is absent", () => {
+      const { date: _date, ...rest } = validEntry;
+      const result = parseLog(JSON.stringify(rest));
+      expect(result?.date.toISOString()).toBe(validEntry.timestamp);
+    });
+
+    it("parses the server's snake_case payload", () => {
+      const { date: _date, durationMs: _duration, raw: _raw, ...rest } = validEntry;
+      const wire = { ...rest, duration_ms: 42 };
+      const result = parseLog(JSON.stringify(wire));
+      expect(result).toMatchObject({ durationMs: 42, raw: wire });
       expect(result?.date.toISOString()).toBe(validEntry.timestamp);
     });
 
