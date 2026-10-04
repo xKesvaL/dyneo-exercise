@@ -1,4 +1,5 @@
 import { IconBug, IconExclamationCircle, IconInfoCircle, type Icon } from "@tabler/icons-react";
+import * as z from "zod";
 import colors from "tailwindcss/colors";
 
 export const API_BASE_URL =
@@ -8,19 +9,21 @@ export const TAIL = 200;
 
 export const MAX_ENTRIES = 1000;
 
-export type Level = "debug" | "info" | "warning" | "error" | "critical";
+export const logSchema = z.object({
+  id: z.string(),
+  timestamp: z.iso.datetime(),
+  date: z.coerce.date(),
+  level: z.enum(["debug", "info", "warning", "error", "critical"]),
+  message: z.string(),
+  service: z.string().nullable(),
+  durationMs: z.number().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  raw: z.unknown(),
+});
 
-export interface LogEntry {
-  id: string;
-  timestamp: string; // raw ISO string
-  date: Date; // parsed
-  level: Level;
-  message: string;
-  service: string | null;
-  durationMs: number | null;
-  metadata: Record<string, unknown>;
-  raw: unknown;
-}
+export type LogEntry = z.infer<typeof logSchema>;
+
+export type Level = LogEntry["level"];
 
 export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "closed";
 
