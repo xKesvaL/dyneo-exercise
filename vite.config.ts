@@ -31,6 +31,10 @@ export default defineConfig({
       },
     ],
   },
+  test: {
+    // Playwright specs live in e2e/ and are run with `test:e2e`.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+  },
   resolve: {
     tsconfigPaths: true,
   },

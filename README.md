@@ -19,12 +19,15 @@ Other commands:
 
 ```sh
 bun run test         # unit tests (Vitest)
+bun run test:e2e     # end-to-end tests (Playwright)
 bun run check         # format + lint + type check
 bun run build         # production build in dist/
 # or npm ...
 ```
 
 The API URL comes from `VITE_API_BASE_URL` in [.env](./.env)
+
+End-to-end tests run in Chromium against a local mock of the logs API (`e2e/mock-api.mjs`), so they are offline and deterministic. Playwright starts the mock API and the app (`vp dev --mode testing`, which loads [.env.testing](./.env.testing)) by itself. The first time, install the browser with `bunx playwright install chromium`.
 
 ### What it does
 
