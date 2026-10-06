@@ -2,6 +2,8 @@
 
 A live log viewer for technicians that provides easily readable information, with details on demand.
 
+Available at [https://dyneo.kesval.com](https://dyneo.kesval.com)
+
 ## Run it
 
 Requires [Bun](https://bun.sh). (also works with Node / npm)
@@ -9,16 +11,17 @@ Requires [Bun](https://bun.sh). (also works with Node / npm)
 ```sh
 bun install
 # or npm install
-vp dev        # http://localhost:5173
+bun run dev           # http://localhost:5173
+# or npm run dev
 ```
 
 Other commands:
 
 ```sh
-vp test run   # unit tests (Vitest)
-vp check      # format + lint + type check
-bun run build # production build in dist/
-# or npm run build
+bun run test         # unit tests (Vitest)
+bun run check         # format + lint + type check
+bun run build         # production build in dist/
+# or npm ...
 ```
 
 The API URL comes from `VITE_API_BASE_URL` in [.env](./.env)
