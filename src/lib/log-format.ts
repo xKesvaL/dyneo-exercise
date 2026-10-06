@@ -56,3 +56,15 @@ export const metadataRows = (metadata: Record<string, unknown>) =>
     label: METADATA_LABELS[key] ?? capitalize(words(key)),
     value: formatValue(key, value),
   }));
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+export const formatTime = (date: Date) =>
+  Number.isNaN(date.getTime())
+    ? "--:--:--"
+    : `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+
+export const formatDateTime = (date: Date, fallback: string) =>
+  Number.isNaN(date.getTime())
+    ? fallback
+    : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${formatTime(date)}`;

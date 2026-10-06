@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import { formatDuration, metadataRows, serviceName } from "./log-format";
+import {
+  formatDateTime,
+  formatDuration,
+  formatTime,
+  metadataRows,
+  serviceName,
+} from "./log-format";
 
 describe("serviceName", () => {
   it("turns slugs into readable names", () => {
@@ -33,5 +39,22 @@ describe("metadataRows", () => {
 
   it("falls back to the status class for unknown codes", () => {
     expect(metadataRows({ http_status: 418 })[0].value).toBe("Request problem (418)");
+  });
+});
+
+describe("date formatting", () => {
+  const date = new Date(2026, 9, 4, 9, 5, 7);
+
+  it("formats the time with 24h numeric parts", () => {
+    expect(formatTime(date)).toBe("09:05:07");
+  });
+
+  it("formats the date day first, with no language-specific words", () => {
+    expect(formatDateTime(date, "?")).toBe("04/10/2026 09:05:07");
+  });
+
+  it("falls back on invalid dates", () => {
+    expect(formatTime(new Date("nope"))).toBe("--:--:--");
+    expect(formatDateTime(new Date("nope"), "raw")).toBe("raw");
   });
 });

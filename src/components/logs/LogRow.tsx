@@ -5,27 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { LEVELS, type LogEntry } from "@/lib/config";
-import { formatDuration, metadataRows, serviceName } from "@/lib/log-format";
-
-const LOCALE = "fr-FR";
-
-const timeFormat = new Intl.DateTimeFormat(LOCALE, {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-const fullDateFormat = new Intl.DateTimeFormat(LOCALE, {
-  dateStyle: "full",
-  timeStyle: "medium",
-});
-
-const formatTime = (date: Date) =>
-  Number.isNaN(date.getTime()) ? "--:--:--" : timeFormat.format(date);
-
-const formatFullDate = (date: Date, fallback: string) =>
-  Number.isNaN(date.getTime()) ? fallback : fullDateFormat.format(date);
+import {
+  formatDateTime,
+  formatDuration,
+  formatTime,
+  metadataRows,
+  serviceName,
+} from "@/lib/log-format";
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false);
@@ -91,7 +77,7 @@ export const LogRow = memo(({ entry }: { entry: LogEntry }) => {
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5">
             <dt className="text-muted-foreground">When</dt>
-            <dd>{formatFullDate(entry.date, entry.timestamp)}</dd>
+            <dd>{formatDateTime(entry.date, entry.timestamp)}</dd>
             {service && (
               <>
                 <dt className="text-muted-foreground">Where</dt>
